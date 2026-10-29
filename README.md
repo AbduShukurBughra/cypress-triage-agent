@@ -1,116 +1,113 @@
 # cypress-triage-agent
 
-Başarısız Cypress testlerini inceleyen küçük bir QA asistanı. Claude, test
-sonuçlarını ve spec dosyalarını okur, gerekirse testi yeniden çalıştırır,
-hatanın olası nedenini açıklar ve bir düzeltme önerir. Dosyada yapılacak her
-değişikliği önce sen onaylarsın.
+A small QA assistant that triages failing Cypress tests. Claude reads the test
+results and spec files, re-runs a spec when needed, explains the most likely
+cause of each failure and suggests a fix. You approve every file change before
+it is made.
 
-Projede ayrıca Cypress giriş testlerinin çalıştığı küçük bir yerel giriş
-sayfası var.
+The project also includes a small local login page for the Cypress login tests
+to run against.
 
-## Gereksinimler
+## Requirements
 
-- Node.js 20.12 veya üstü (`.env` dosyası `process.loadEnvFile` ile okunuyor; v24 ile test edildi)
-- Bir Anthropic API anahtarı ([platform.claude.com](https://platform.claude.com) → API Keys)
-- Linux sunucuda başsız (headless) çalıştırmak için Xvfb (`sudo apt install xvfb`)
+- Node.js 20.12 or later (`.env` is loaded with `process.loadEnvFile`; tested on v24)
+- An Anthropic API key ([platform.claude.com](https://platform.claude.com) → API Keys)
+- Xvfb to run headless on a Linux server (`sudo apt install xvfb`)
 
-## Kurulum
+## Setup
 
 ```bash
 git clone https://github.com/AbduShukurBughra/cypress-triage-agent.git
 cd cypress-triage-agent
 npm install
-cp .env.example .env   # sonra .env içine kendi ANTHROPIC_API_KEY değerini yaz
+cp .env.example .env   # then put your own ANTHROPIC_API_KEY in .env
 ```
 
-`.env` git tarafından yok sayılır; onu asla commit etme. Commit edilecek dosya
-`.env.example`'dır.
+`.env` is git-ignored; never commit it. Commit `.env.example` instead.
 
-## Ajanı çalıştırma
+## Running the agent
 
 ```bash
 npm run agent
 ```
 
-Görev verilmezse varsayılan görev şudur: *"Why are my tests failing? How do I fix them?"*
-Kendi görevini de verebilirsin:
+Without a task, the agent uses the default: *"Why are my tests failing? How do I fix them?"*
+You can also give it your own:
 
 ```bash
-npm run agent -- "login testleri neden başarısız oluyor?"
+npm run agent -- "why is the login spec failing?"
 ```
 
-Ajan en fazla 10 tur çalışır (`src/agent.ts` içindeki `MAX_TURNS`).
+The agent stops after at most 10 turns (`MAX_TURNS` in `src/agent.ts`).
 
-### Ajanın araçları
+### The agent's tools
 
-| Araç | Ne yapar |
+| Tool | What it does |
 |---|---|
-| `get_test_results` | `test-results/results.json` dosyasındaki son test sonuçlarını döndürür |
-| `read_file` | Projedeki bir dosyayı okur (`node_modules` hariç) |
-| `run_cypress_spec` | `cypress/` altındaki bir spec'i başsız çalıştırır (en fazla 5 dakika) |
-| `write_file` | `cypress/` altında bir dosya oluşturur veya değiştirir; önce farkı (diff) gösterir ve onay ister |
+| `get_test_results` | Returns the latest test results from `test-results/results.json` |
+| `read_file` | Reads a file in the project (not `node_modules`) |
+| `run_cypress_spec` | Runs one spec under `cypress/` headless (5-minute limit) |
+| `write_file` | Creates or changes a file under `cypress/`; shows the diff first and asks for approval |
 
-Güvenlik kuralları:
+Safety rules:
 
-- Ajan proje klasörünün dışına çıkamaz.
-- Sadece `cypress/` altına yazabilir.
-- Her değişikliği terminalde `[y/N]` ile onaylaman gerekir. Terminal yoksa
-  (CI, yönlendirilmiş girdi) değişiklik otomatik olarak reddedilir.
+- The agent can't reach files outside the project folder.
+- It can only write under `cypress/`.
+- You approve each change in the terminal with `[y/N]`. Without a terminal
+  (CI, piped input), changes are refused automatically.
 
-> **Not:** `test-results/results.json` kendiliğinden güncellenmez. Ajan buradaki
-> eski sonuçları okuyabilir, bu yüzden yeni bir çalıştırmadan sonra dosyayı
-> güncel tut.
+> **Note:** `test-results/results.json` is not updated automatically. The agent
+> may read old results from it, so keep it current after a new run.
 
-## Cypress testleri
+## Cypress tests
 
 ```bash
-npx cypress run --spec cypress/e2e/login.cy.ts   # tek spec
-npx cypress run                                  # cypress/e2e/ altındaki tüm spec'ler
+npx cypress run --spec cypress/e2e/login.cy.ts   # one spec
+npx cypress run                                  # every spec under cypress/e2e/
 ```
 
-`cypress.config.ts`, testlerden önce yerel giriş sayfasını
-(`cypress/support/login-app.ts`) `http://localhost:3000` adresinde başlatır ve
-testler bitince kapatır. Ayrı bir sunucu başlatmana gerek yok. 3000 portu
-doluysa başka bir port seç:
+`cypress.config.ts` starts the local login page (`cypress/support/login-app.ts`)
+on `http://localhost:3000` before the specs run and stops it when they finish,
+so there's no separate server to start. If port 3000 is taken, pick another:
 
 ```bash
 LOGIN_APP_PORT=4000 npx cypress run
 ```
 
-Yerel giriş sayfası:
+The local login page:
 
-| Adres | Davranış |
+| Route | Behavior |
 |---|---|
-| `/login` | E-posta ve şifre formu |
-| `POST /login` | Doğru bilgilerle `/dashboard`'a yönlendirir, yanlışsa "Invalid credentials" gösterir |
-| `/dashboard` | Giriş sonrası sayfa |
+| `/login` | Email and password form |
+| `POST /login` | Redirects to `/dashboard` on valid credentials, otherwise shows "Invalid credentials" |
+| `/dashboard` | Page shown after logging in |
 
-Test hesabı `qa@example.com` / `correct-horse`'dur. Sadece bu yerel sayfada
-geçerlidir.
+The test account is `qa@example.com` / `correct-horse`. It only works against
+this local page.
 
-> Chrome veya Firefox kurulu değilse Cypress kendi Electron tarayıcısını
-> kullanır ve bunun kullanımdan kalkacağı uyarısını gösterir. Chrome kurup
-> `--browser chrome` ekleyerek bu uyarıdan kurtulabilirsin.
+> If Chrome or Firefox isn't installed, Cypress falls back to its built-in
+> Electron browser and warns that Electron is deprecated. Install Chrome and add
+> `--browser chrome` to avoid it.
 
-## Proje yapısı
+## Project structure
 
 ```
 .
 ├── cypress/
-│   ├── e2e/login.cy.ts          # giriş testleri
-│   └── support/login-app.ts     # testler için yerel giriş sayfası
+│   ├── e2e/login.cy.ts          # login tests
+│   └── support/login-app.ts     # local login page for the tests
 ├── src/
-│   ├── agent.ts                 # ajan döngüsü (Claude Tool Runner)
-│   ├── env.ts                   # .env dosyasını yükler
-│   └── tools.ts                 # ajanın araçları
-├── test-results/results.json    # ajanın okuduğu test sonuçları
+│   ├── agent.ts                 # agent loop (Claude Tool Runner)
+│   ├── env.ts                   # loads .env
+│   └── tools.ts                 # the agent's tools
+├── test-results/results.json    # test results the agent reads
 ├── cypress.config.ts
 ├── .env.example
 └── tsconfig.json
 ```
 
-## Diğer komutlar
+## Other commands
 
 ```bash
-npm run typecheck   # TypeScript tip kontrolü (src/)
+npm run typecheck   # TypeScript type check (src/)
 ```
