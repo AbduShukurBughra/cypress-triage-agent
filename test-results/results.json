@@ -1,0 +1,13 @@
+{
+  "run": "2026-10-29T08:12:00Z",
+  "browser": "chrome",
+  "tests": [
+    { "spec": "cypress/e2e/login.cy.ts", "title": "shows the login form", "state": "passed", "durationMs": 812 },
+    { "spec": "cypress/e2e/login.cy.ts", "title": "logs in with valid credentials", "state": "failed", "durationMs": 4120,
+      "error": "AssertionError: Timed out retrying after 4000ms: expected '/login' to include '/dashboard'" },
+    { "spec": "cypress/e2e/login.cy.ts", "title": "shows an error for a wrong password", "state": "failed", "durationMs": 4087,
+      "error": "AssertionError: Timed out retrying after 4000ms: Expected to find element: [data-cy=login-error], but never found it." },
+    { "spec": "cypress/e2e/cart.cy.ts", "title": "adds an item to the cart", "state": "passed", "durationMs": 1502 },
+    { "spec": "cypress/e2e/cart.cy.ts", "title": "removes an item from the cart", "state": "passed", "durationMs": 1333 }
+  ]
+}
